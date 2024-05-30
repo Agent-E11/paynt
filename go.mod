@@ -1,4 +1,4 @@
-module color_go
+module github.com/agent-e11/color_go
 
 go 1.22.1
 
