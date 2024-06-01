@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"errors"
 	"fmt"
 	"os"
@@ -29,15 +30,91 @@ const (
 	Default = Esc + "[39m"
 )
 
-type ColorExpression struct {
+type colorExpression struct {
 	Pattern   *regexp.Regexp
 	ColorCode string
 }
 
-func parseColorExpression(expStr string) (ColorExpression, error) {
+func main() {
+	var separator string
+	pflag.StringVarP(&separator, "separator", "s", "\n", "test")
+
+	pflag.Usage = func() {
+		fmt.Fprintf(os.Stderr, "Usage: %s [OPTION]... EXPRESSION...\n\n", os.Args[0])
+
+		fmt.Fprintf(os.Stderr, "Options:\n")
+		pflag.PrintDefaults()
+		fmt.Fprint(os.Stderr, "\n") // Newline
+
+		fmt.Fprintln(os.Stderr,
+`Expressions:
+  Expressions are in the form <regex>:<color>.
+  Valid colors are black, red, green, yellow,
+  blue, magenta, cyan, white, and default.`,
+		)
+	}
+	pflag.Parse()
+
+	exps := []colorExpression{}
+
+	for _, arg := range pflag.Args() {
+		exp, err := parseColorExpression(arg)
+		if err != nil {
+			fmt.Println("Error:", err)
+			continue
+		}
+		exps = append(exps, exp)
+	}
+
+	// Ensure stdin is from pipe, and not terminal
+	// I am not sure how this works...
+	stat, err := os.Stdin.Stat()
+	if err != nil {
+		fmt.Println("Error:", err)
+		os.Exit(1)
+	}
+	if (stat.Mode() & os.ModeCharDevice) != 0 {
+		fmt.Println("please pipe something from stdin")
+		os.Exit(1)
+	}
+
+	scanner := bufio.NewScanner(os.Stdin)
+	if separator != "\n" {
+		scanner.Split(func(data []byte, atEOF bool) (advance int, token []byte, err error) {
+			// If we are at the end of file, and there is no more data, return nothing.
+			if atEOF && len(data) == 0 {
+				return 0, nil, nil
+			}
+			if i := bytes.Index(data, []byte(separator)); i >= 0 {
+				// We have a full token, return it and skip the length of the separator
+				return i + len(separator), data[0:i], nil
+			}
+			// If we're at EOF, we have a final, non-terminated line. Return it.
+			if atEOF {
+				return len(data), data, nil
+			}
+			// Request more data.
+			return 0, nil, nil
+		})
+	}
+
+	for scanner.Scan() {
+		text := scanner.Text()
+		for _, exp := range exps {
+			if exp.Pattern.MatchString(text) {
+				text = fmt.Sprint(exp.ColorCode, text, Reset)
+				break
+			}
+		}
+
+		fmt.Print(text, separator)
+	}
+}
+
+func parseColorExpression(expStr string) (colorExpression, error) {
 	idx := strings.LastIndex(expStr, ":")
 
-	exp := ColorExpression{}
+	exp := colorExpression{}
 
 	if idx == -1 {
 		return exp, errors.New("`:` not found in color expression")
@@ -84,44 +161,3 @@ func parseColorExpression(expStr string) (ColorExpression, error) {
 	return exp, nil
 }
 
-func main() {
-	pflag.Parse()
-
-	exps := []ColorExpression{}
-
-	for i, arg := range pflag.Args() {
-		fmt.Printf("Arg %d: %s\n", i, arg)
-		exp, err := parseColorExpression(arg)
-		if err != nil {
-			fmt.Println("Error:", err)
-			continue
-		}
-		exps = append(exps, exp)
-	}
-
-	scanner := bufio.NewScanner(os.Stdin)
-
-	// Ensure stdin is from pipe, and not terminal
-	// I am not sure how this works...
-	stat, err := os.Stdin.Stat()
-	if err != nil {
-		fmt.Println("Error:", err)
-		os.Exit(1)
-	}
-	if (stat.Mode() & os.ModeCharDevice) != 0 {
-		fmt.Println("please pipe something from stdin")
-		os.Exit(1)
-	}
-
-	for scanner.Scan() {
-		text := scanner.Text()
-		for _, exp := range exps {
-			if exp.Pattern.MatchString(text) {
-				text = fmt.Sprint(exp.ColorCode, text, Reset)
-				break
-			}
-		}
-
-		fmt.Print(text, "\n")
-	}
-}

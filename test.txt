@@ -1,0 +1,7 @@
+red
+green
+blue
+test
+this is a test
+cool
+wow
