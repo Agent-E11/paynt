@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/spf13/pflag"
@@ -31,6 +32,8 @@ const (
 )
 
 type colorExpression struct {
+	//Type expressionType
+	Selector int
 	Pattern   *regexp.Regexp
 	ColorCode string
 }
@@ -48,10 +51,29 @@ func main() {
 
 		fmt.Fprintln(os.Stderr,
 `Expressions:
-  Expressions are in the form <regex>:<color>.
-  Valid colors are black, red, green, yellow,
-  blue, magenta, cyan, white, and default.`,
-		)
+  Expressions are in the form [selector/]<regex>/[color].
+  Any number of expressions can be provided. If multiple
+  expressions match a line, the leftmost expression will
+  be applied.
+
+  selector
+    A number defining what the regex should match against.
+    If it is greater than -1, then the field of that index
+    is matched against.
+    If it is -1, then the entire line is matched.
+    If it is omitted, then it will default to -1.
+
+  regex
+    Regular expression to match against the selected text.
+    Can be any valid syntax as defined in Go's regexp/syntax
+    package:
+    https://pkg.go.dev/regexp/syntax
+
+  color
+    Color to color the line if the regex matches.
+    Can be black, red, green, yellow, blue, magenta,
+    cyan, white, or default.
+    If it is omitted, then it will default to default.`)
 	}
 	pflag.Parse()
 
@@ -99,29 +121,47 @@ func main() {
 	}
 
 	for scanner.Scan() {
-		text := scanner.Text()
+		line := scanner.Text()
 		for _, exp := range exps {
-			if exp.Pattern.MatchString(text) {
-				text = fmt.Sprint(exp.ColorCode, text, Reset)
+			matchText := line
+			if exp.Selector > -1 {
+				matchText = strings.Split(line, " ")[exp.Selector]
+				fmt.Printf("matchText: `%s`", matchText)
+			}
+			if exp.Pattern.MatchString(matchText) {
+				line = fmt.Sprint(exp.ColorCode, line, Reset)
 				break
 			}
 		}
 
-		fmt.Print(text, separator)
+		fmt.Print(line, separator)
 	}
 }
 
 func parseColorExpression(expStr string) (colorExpression, error) {
-	idx := strings.LastIndex(expStr, ":")
+	firstIdx := strings.Index(expStr, "/")
+	lastIdx := strings.LastIndex(expStr, "/")
 
 	exp := colorExpression{}
 
-	if idx == -1 {
-		return exp, errors.New("`:` not found in color expression")
+	if firstIdx == -1 {
+		return exp, errors.New("`/` not found in color expression")
 	}
 
-	patternStr := expStr[:idx]
-	color := expStr[idx+1:]
+	selector := -1
+
+	if firstIdx == lastIdx {
+		firstIdx = -1
+	} else {
+		var err error
+		selector, err = strconv.Atoi(expStr[0:firstIdx])
+		if err != nil {
+			return exp, errors.New("invalid selector")
+		}
+	}
+
+	patternStr := expStr[firstIdx+1:lastIdx]
+	color := expStr[lastIdx+1:]
 
 	// Map color to color code
 	var colorCode string
@@ -155,6 +195,7 @@ func parseColorExpression(expStr string) (colorExpression, error) {
 		return exp, err
 	}
 
+	exp.Selector = selector
 	exp.Pattern = pattern
 	exp.ColorCode = colorCode
 
