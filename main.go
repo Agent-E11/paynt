@@ -12,6 +12,10 @@ import (
 )
 
 func main() {
+	var fieldSeparator string
+	// TODO: Set help text
+	pflag.StringVarP(&fieldSeparator, "field-separator", "F", "", "")
+
 	var separator string
 	pflag.StringVarP(&separator, "separator", "s", "\n", "test")
 
@@ -20,10 +24,9 @@ func main() {
 
 		fmt.Fprintf(os.Stderr, "Options:\n")
 		pflag.PrintDefaults()
-		fmt.Fprint(os.Stderr, "\n") // Newline
 
-		fmt.Fprintln(os.Stderr,
-`Expressions:
+		fmt.Fprintln(os.Stderr, `
+Expressions:
   Expressions are in the form [selector/]<regex>/[color].
   Any number of expressions can be provided. If multiple
   expressions match a line, the leftmost expression will
@@ -98,7 +101,18 @@ func main() {
 		for _, exp := range exps {
 			matchText := line
 			if exp.Selector > -1 {
-				matchText = strings.Split(line, " ")[exp.Selector]
+				var fields []string
+				if fieldSeparator == "" {
+					fields = strings.Fields(line)
+				} else {
+					fields = strings.Split(line, fieldSeparator)
+				}
+
+				if exp.Selector >= len(fields) {
+					// TODO: Handle this error instead of just skipping
+					continue
+				}
+				matchText = fields[exp.Selector]
 			}
 			if exp.Pattern.MatchString(matchText) {
 				line = fmt.Sprint(exp.ColorCode, line, colexp.Reset)
@@ -109,4 +123,3 @@ func main() {
 		fmt.Print(line, separator)
 	}
 }
-
