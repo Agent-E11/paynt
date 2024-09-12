@@ -3,40 +3,18 @@ package main
 import (
 	"bufio"
 	"bytes"
-	"errors"
+
+	//"errors"
 	"fmt"
 	"os"
-	"regexp"
-	"strconv"
+
+	//"regexp"
+	//"strconv"
 	"strings"
 
+	colexp "github.com/agent-e11/paynt/colorexpression"
 	"github.com/spf13/pflag"
 )
-
-const (
-	// Escape key
-	Esc string = "\u001b"
-	// Reset color
-	Reset = Esc + "[0m"
-
-	// Color codes
-	Black   = Esc + "[30m" + Esc + "[47m"
-	Red     = Esc + "[31m"
-	Green   = Esc + "[32m"
-	Yellow  = Esc + "[33m"
-	Blue    = Esc + "[34m"
-	Magenta = Esc + "[35m"
-	Cyan    = Esc + "[36m"
-	White   = Esc + "[37m"
-	Default = Esc + "[39m"
-)
-
-type colorExpression struct {
-	//Type expressionType
-	Selector int
-	Pattern   *regexp.Regexp
-	ColorCode string
-}
 
 func main() {
 	var separator string
@@ -77,10 +55,10 @@ func main() {
 	}
 	pflag.Parse()
 
-	exps := []colorExpression{}
+	exps := []colexp.ColorExpression{}
 
 	for _, arg := range pflag.Args() {
-		exp, err := parseColorExpression(arg)
+		exp, err := colexp.ParseColorExpression(arg)
 		if err != nil {
 			fmt.Println("Error:", err)
 			continue
@@ -126,79 +104,14 @@ func main() {
 			matchText := line
 			if exp.Selector > -1 {
 				matchText = strings.Split(line, " ")[exp.Selector]
-				fmt.Printf("matchText: `%s`", matchText)
 			}
 			if exp.Pattern.MatchString(matchText) {
-				line = fmt.Sprint(exp.ColorCode, line, Reset)
+				line = fmt.Sprint(exp.ColorCode, line, colexp.Reset)
 				break
 			}
 		}
 
 		fmt.Print(line, separator)
 	}
-}
-
-func parseColorExpression(expStr string) (colorExpression, error) {
-	firstIdx := strings.Index(expStr, "/")
-	lastIdx := strings.LastIndex(expStr, "/")
-
-	exp := colorExpression{}
-
-	if firstIdx == -1 {
-		return exp, errors.New("`/` not found in color expression")
-	}
-
-	selector := -1
-
-	if firstIdx == lastIdx {
-		firstIdx = -1
-	} else {
-		var err error
-		selector, err = strconv.Atoi(expStr[0:firstIdx])
-		if err != nil {
-			return exp, errors.New("invalid selector")
-		}
-	}
-
-	patternStr := expStr[firstIdx+1:lastIdx]
-	color := expStr[lastIdx+1:]
-
-	// Map color to color code
-	var colorCode string
-	switch strings.ToLower(color) {
-	case "black":
-		colorCode = Black
-	case "red":
-		colorCode = Red
-	case "green":
-		colorCode = Green
-	case "yellow":
-		colorCode = Yellow
-	case "blue":
-		colorCode = Blue
-	case "magenta":
-		colorCode = Magenta
-	case "cyan":
-		colorCode = Cyan
-	case "white":
-		colorCode = White
-	case "default":
-		colorCode = Default
-	case "":
-		colorCode = Default
-	default:
-		return exp, errors.New("invalid color name")
-	}
-
-	pattern, err := regexp.Compile(patternStr)
-	if err != nil {
-		return exp, err
-	}
-
-	exp.Selector = selector
-	exp.Pattern = pattern
-	exp.ColorCode = colorCode
-
-	return exp, nil
 }
 
