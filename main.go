@@ -3,13 +3,8 @@ package main
 import (
 	"bufio"
 	"bytes"
-
-	//"errors"
 	"fmt"
 	"os"
-
-	//"regexp"
-	//"strconv"
 	"strings"
 
 	colexp "github.com/agent-e11/paynt/colorexpression"

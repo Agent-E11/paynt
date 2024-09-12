@@ -1,0 +1,5 @@
+# Environment variable secrets
+*.env
+
+# Build artifacts
+dist/
