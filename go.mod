@@ -1,4 +1,4 @@
-module github.com/agent-e11/color_go
+module github.com/agent-e11/paynt
 
 go 1.22.1
 
