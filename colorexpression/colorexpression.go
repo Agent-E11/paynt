@@ -7,6 +7,7 @@ import (
 	"strings"
 )
 
+// ANSI Escape Sequences
 const (
 	// Escape key
 	Esc string = "\u001b"
@@ -25,8 +26,13 @@ const (
 	Default = Esc + "[39m"
 )
 
+type Selector int
+const (
+	Line Selector = -1
+)
+
 type ColorExpression struct {
-	Selector  int
+	Selector Selector
 	Pattern   *regexp.Regexp
 	ColorCode string
 }
@@ -41,16 +47,17 @@ func ParseColorExpression(expStr string) (ColorExpression, error) {
 		return exp, errors.New("`/` not found in color expression")
 	}
 
-	selector := -1
+	selector := Line
 
 	if firstIdx == lastIdx {
 		firstIdx = -1
 	} else {
 		var err error
-		selector, err = strconv.Atoi(expStr[0:firstIdx])
+		selectorInt, err := strconv.Atoi(expStr[0:firstIdx])
 		if err != nil {
 			return exp, errors.New("invalid selector")
 		}
+		selector = Selector(selectorInt)
 	}
 
 	patternStr := expStr[firstIdx+1 : lastIdx]
