@@ -1,0 +1,5 @@
+error this is a test
+info  this is some info
+warn  this is a warning
+info  bla bla bla
+error something bad happened
